@@ -17,20 +17,28 @@ export type ProductsPage = {
   total: number;
 };
 
-export async function getDashboardAction(): Promise<DashboardResponse> {
+
+export async function getDashboardAction(): Promise<DashboardResponse | null> {
   const s = await cookies();
-  return runProtectedSession(s, async (store) => {
-    const user = await me(store);
-    const [cartsResp, productsResp] = await Promise.all([
-      getCartsByUser(store, user.id),
-      getProducts(store, 5, 0),
-    ]);
-    const raw = cartsResp?.carts ?? cartsResp ?? [];
-    const carts = Array.isArray(raw) ? raw : [];
-    const products = productsResp?.products ?? [];
-    const totalProducts = productsResp?.total ?? 0;
-    return { user, carts, products, totalProducts };
-  });
+  try {
+    return await runProtectedSession(s, async (store) => {
+      const user = await me(store);
+      const [cartsResp, productsResp] = await Promise.all([
+        getCartsByUser(store, user.id),
+        getProducts(store, 5, 0),
+      ]);
+      const raw = cartsResp?.carts ?? cartsResp ?? [];
+      const carts = Array.isArray(raw) ? raw : [];
+      const products = productsResp?.products ?? [];
+      const totalProducts = productsResp?.total ?? 0;
+      return { user, carts, products, totalProducts };
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === "session_expired") {
+      return null;
+    }
+    throw err;
+  }
 }
 
 export async function getProductsAction(skip: number): Promise<ProductsPage> {

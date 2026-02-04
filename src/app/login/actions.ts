@@ -21,8 +21,9 @@ export async function loginAction(_prevState: LoginState, formData: FormData): P
       accessToken: data.accessToken,
       refreshToken: data.refreshToken,
     });
-  } catch {
-    return { error: "Неверный логин или пароль" };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { error: message || "Произошла ошибка" };
   }
 
   redirect("/dashboard");

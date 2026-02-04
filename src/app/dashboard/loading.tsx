@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, Skeleton } from "@/components/ui";
 
-export function DashboardLoading() {
+export default function DashboardLoading() {
   return (
     <div className="min-h-screen space-y-6 p-6 pb-20">
       <Skeleton className="h-8 w-32" />

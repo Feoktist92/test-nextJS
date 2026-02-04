@@ -1,4 +1,4 @@
-import { clearTokensInStore, type CookieStore } from "./cookies";
+import type { CookieStore } from "./cookies";
 import { SessionExpiredError } from "@/lib/dummyjson/http";
 
 export async function runProtectedSession<T>(
@@ -10,7 +10,6 @@ export async function runProtectedSession<T>(
     return await fn(store);
   } catch (err) {
     if (err instanceof SessionExpiredError) {
-      clearTokensInStore(store);
       throw new Error("session_expired");
     }
     const message = err instanceof Error ? err.message : errorMessage;

@@ -43,6 +43,20 @@ export function setTokensInStore(
   });
 }
 
+export function saveTokensIfWritable(
+  store: CookieStore,
+  tokens: { accessToken: string; refreshToken: string } | undefined
+): void {
+  if (!tokens) return;
+  try {
+    setTokensInStore(store, tokens);
+  } catch {
+    if (process.env.NODE_ENV === "development") {
+      console.debug("[auth] Tokens not writable in this context (e.g. Server Component). Will persist on next Server Action.");
+    }
+  }
+}
+
 export function clearTokensInStore(store: CookieStore): void {
   store.set(ACCESS_TOKEN_COOKIE, "", { ...COOKIE_OPTS, maxAge: 0 });
   store.set(REFRESH_TOKEN_COOKIE, "", { ...COOKIE_OPTS, maxAge: 0 });

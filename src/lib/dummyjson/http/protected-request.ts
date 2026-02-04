@@ -1,4 +1,4 @@
-import { getTokensFromStore, setTokensInStore, type CookieStore } from "@/lib/auth/cookies";
+import { getTokensFromStore, saveTokensIfWritable, type CookieStore } from "@/lib/auth/cookies";
 import { refreshTokens } from "../api/refresh";
 import type { RefreshResponse } from "../types";
 import { fetchDummyJson, parseJson, type FetchMethod } from "./fetch";
@@ -16,11 +16,15 @@ export type RequestOptionsWithoutToken = {
   body?: unknown;
 };
 
-async function performRefresh(refreshToken: string): Promise<{
-  accessToken: string;
-  newTokens: RefreshResponse;
-}> {
-  const newTokens = await refreshTokens(refreshToken);
+type AccessTokenResult = { accessToken: string; newTokens?: RefreshResponse };
+
+async function getAccessToken(store: CookieStore, forceRefresh = false): Promise<AccessTokenResult> {
+  const tokenPair = getTokensFromStore(store);
+  if (!tokenPair.refreshToken) throw new SessionExpiredError("No token pair");
+  if (!forceRefresh && tokenPair.accessToken) {
+    return { accessToken: tokenPair.accessToken };
+  }
+  const newTokens = await refreshTokens(tokenPair.refreshToken);
   return { accessToken: newTokens.accessToken, newTokens };
 }
 
@@ -29,23 +33,12 @@ export async function requestProtected<T>(
   opts: RequestOptionsWithoutToken
 ): Promise<T> {
   const { method, path, body } = opts;
-  const tokenPair = getTokensFromStore(store);
-  if (!tokenPair.refreshToken) throw new SessionExpiredError("No token pair");
-
-  let accessToken = tokenPair.accessToken;
-  let newTokens: RefreshResponse | undefined;
-  if (!accessToken) {
-    const refreshed = await performRefresh(tokenPair.refreshToken);
-    accessToken = refreshed.accessToken;
-    newTokens = refreshed.newTokens;
-  }
+  let { accessToken, newTokens } = await getAccessToken(store);
 
   let res = await fetchDummyJson(path, { method, body, accessToken });
   if (res.status === 401) {
     try {
-      const refreshed = await performRefresh(tokenPair.refreshToken);
-      accessToken = refreshed.accessToken;
-      newTokens = refreshed.newTokens;
+      ({ accessToken, newTokens } = await getAccessToken(store, true));
       res = await fetchDummyJson(path, { method, body, accessToken });
     } catch {
       throw new SessionExpiredError("Refresh failed");
@@ -53,6 +46,6 @@ export async function requestProtected<T>(
     if (res.status === 401) throw new SessionExpiredError("Still unauthorized after refresh");
   }
 
-  if (newTokens) setTokensInStore(store, newTokens);
+  saveTokensIfWritable(store, newTokens);
   return parseJson<T>(res);
 }
